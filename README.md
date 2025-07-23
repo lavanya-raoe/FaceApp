@@ -1,97 +1,196 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Face Verification App
 
-# Getting Started
+This is a mobile face verification application built with **React Native** and **Python** (via **Chaquopy**) for Android.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+---
 
-## Step 1: Start Metro
+## 🧠 Face Add (Enrollment)
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+The app allows a user to **enroll their face** using the camera. It detects and aligns the face, generates a 512-dimension embedding using a lightweight deep learning model (MobileFaceNet), and stores it **locally** on the device.
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+---
 
-```sh
-# Using npm
-npm start
+## 📦 Storage
 
-# OR using Yarn
-yarn start
+- The face embeddings are stored in JSON format at:
+
+  ```
+  /data/user/0/com.myfaceapp/files/face_db.json
+  ```
+
+- This is Android’s private app storage path, accessible only to the app.
+
+- Each enrolled user is identified by a **UUID** (e.g., `8b6f0f16-9c24-43a3-a6c7-55d9606b53a8`) generated during enrollment.
+
+- The data is stored as:
+
+  ```json
+  {
+    "8b6f0f16-9c24-43a3-a6c7-55d9606b53a8": {
+      "name": "John Doe",
+      "embedding": [0.123, 0.456, ...]
+    }
+  }
+  ```
+
+---
+
+## 🏧 Python Location
+
+All face logic (alignment, embedding, verification, storage) is handled inside:
+
+```
+MyfaceApp/android/pyengine/src/main/python/face_module.py
 ```
 
-## Step 2: Build and run your app
+---
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+## 📸 Screenshot
 
-### Android
 
-```sh
-# Using npm
-npm run android
 
-# OR using Yarn
-yarn android
+---
+
+## 🧪 Functions (Python Backend)
+
+> ℹ️ **Note:** The input image is aligned and resized to **112×112 pixels** before generating a 512-dimensional face embedding using MobileFaceNet. This ensures accuracy and compatibility with the model.
+
+### 🔧 Detailed Functionalities
+
+1. **enroll(user\_id, name, image\_b64)**
+
+   - Accepts a unique `user_id`, a name, and a base64-encoded image string.
+   - Aligns and normalizes the face image.
+   - Generates a 512-d vector using the MobileFaceNet model.
+   - Stores the embedding with the user ID and name in a local JSON file.
+   - Returns a success JSON response with the user ID.
+
+2. **verify(image\_b64, threshold=0.3)**
+
+   - Accepts a base64-encoded image and a similarity threshold.
+   - Aligns and generates an embedding for the input image.
+   - Compares this against every enrolled face using cosine similarity.
+   - Returns the highest similarity match, its ID and name, and whether the match passes the threshold (i.e., is verified).
+
+3. **clear\_all()**
+
+   - Deletes the face database JSON file from internal storage.
+   - Useful for resetting or cleaning the app's state.
+
+4. **list\_all()**
+
+   - Returns a list of all enrolled users with their IDs and names.
+   - Helps in debugging or managing users from the frontend.
+
+### 🧠 Backend Flow Summary
+
+- Face is first **aligned** using MTCNN for consistency.
+- Then it's resized to **112×112 pixels**.
+- Processed using a PyTorch-based **MobileFaceNet** model to extract the embedding.
+- Embeddings are stored and later compared using **cosine similarity**.
+
+
+
+> ℹ️ **Note:** The input image is aligned and resized to **112×112 pixels** before generating a 512-dimensional face embedding using MobileFaceNet. This ensures accuracy and compatibility with the model.
+
+- `enroll(user_id, name, image_b64)` – Adds a new user face to the database.
+- `verify(image_b64)` – Verifies a face against enrolled users.
+- `clear_all()` – Clears the database.
+- `list_all()` – Lists all enrolled users.
+
+---
+
+## ✅ Run the App
+
+1. Start the React Native server:
+
+   ```bash
+   npm start
+   ```
+
+2. Run the Android app:
+
+   ```bash
+   npx react-native run-android
+   ```
+
+Make sure to place your model file in:
+
+```
+MyfaceApp/android/pyengine/src/main/python/models/MFN_AdaArcDistill_backbone.pth
 ```
 
-### iOS
+---
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+## 🏗️ Architecture
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+The architecture of the Face Verification App integrates React Native (frontend) and Python (backend) using Chaquopy on Android:
 
-```sh
-bundle install
+### 🔄 System Overview
+
+```
+[User Interaction via UI]
+        ↓
+[React Native (JavaScript/TypeScript)]
+        ↓
+[Native Bridge (Java <-> Python) via Chaquopy]
+        ↓
+[Python Backend: face_module.py]
+        ↓
+[Model Inference using MobileFaceNet + Torch]
+        ↓
+[Local JSON DB: face_db.json]
 ```
 
-Then, and every time you update your native dependencies, run:
+### 🔹 Key Components
 
-```sh
-bundle exec pod install
+- **React Native UI:**
+
+  - Captures user name and face image.
+  - Generates UUID for each user.
+  - Sends base64-encoded image to native backend.
+
+- **Chaquopy (Android-Python bridge):**
+
+  - Enables direct calls from React Native to Python functions.
+  - Communicates via NativeModules in JS and Chaquopy plugin in Android.
+
+- **Python Backend (face\_module.py):**
+
+  - Aligns the face using MTCNN.
+  - Resizes to 112×112 and passes through MobileFaceNet model.
+  - Stores or compares face embeddings.
+  - Manages a local JSON database of enrolled users.
+
+- **Model & Embedding:**
+
+  - MobileFaceNet is used for lightweight, fast embedding generation.
+  - Embeddings are 512-dimension vectors.
+
+- **Data Storage:**
+
+  - Stored locally in JSON format in app-private Android storage path.
+
+---
+
+## 🛠 Requirements
+
+- **Node.js** (LTS version recommended)
+- **Java 1.8** (required for Android builds)
+
+Ensure Chaquopy is configured in `build.gradle` and `Python` packages like `opencv-python`, `numpy`, `facenet-pytorch`, `torch`, and `Pillow` are installed via:
+
+```groovy
+python {
+    pip {
+        install "opencv-python"
+        install "numpy"
+        install "facenet-pytorch"
+        install "torch"
+        install "Pillow"
+    }
+}
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+---
 
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
